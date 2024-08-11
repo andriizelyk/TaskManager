@@ -1,15 +1,24 @@
-import { FaRegTrashAlt } from "react-icons/fa";
-import { Column } from "../types";
-import { useSortable } from "@dnd-kit/sortable";
+import { FaPlus, FaRegTrashAlt } from "react-icons/fa";
+import { Column, Task } from "../types";
+import { SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useMemo, useState } from "react";
+import TaskCard from "./TaskCard";
 
 interface Props {
     column: Column;
+    tasks: Task[];
     deleteColumn: (id : string) => void;
+    updateColumnTitle: (id : string, title: string) => void;
+    createTask: (columnId : string) => void;
+    deleteTask: (taskId : string) => void;
+    updateTaskContent: (taskId : string, content: string) => void;
 };
 
 function ColumnContainer(props: Props) {
-    const { column, deleteColumn } = props;
+    const { column, tasks, deleteColumn, updateColumnTitle, createTask, deleteTask, updateTaskContent } = props;
+    const [editMode, setEditMode] = useState(false);
+    const tasksIds = useMemo(() => {return tasks.map(t => t.id);}, [tasks])
     const {
         setNodeRef, 
         attributes, 
@@ -22,7 +31,9 @@ function ColumnContainer(props: Props) {
         data: {
             type: "Column",
             column,
-        }});
+        },
+        disabled: editMode
+    });
 
     const style = {
         transition,
@@ -61,6 +72,7 @@ function ColumnContainer(props: Props) {
         <div
             {...attributes} 
             {...listeners}
+            onClick={() => setEditMode(true)}
             className="
         bg-gray-800
         text-md
@@ -88,15 +100,45 @@ function ColumnContainer(props: Props) {
                 rounded-full">
                 0           
                 </div>
-                {column.title}
+                {!editMode && column.title}
+                {editMode && <input 
+                    className="bg-black focus:border-gray-500 border rounded outline-none px-2"
+                    value = {column.title}
+                    onChange={e => {updateColumnTitle(column.id, e.target.value)}}
+                    autoFocus 
+                    onBlur = {() => setEditMode(false)}
+                    onKeyDown={e => {
+                        if (e.key !== "Enter") return;
+
+                        setEditMode(false);
+                    }}/>}
             </div>
             <button onClick={() => deleteColumn(column.id)}>
                 <FaRegTrashAlt />
             </button>
         </div>
-        <div className="flex flex-grow">Content</div>
+        <div className="flex flex-grow flex-col gap-4 p-2 overflow-auto">
+            <SortableContext items={tasksIds}>
+                {
+                    tasks.map(t => (<TaskCard key={t.id} task={t} deleteTask={deleteTask} updateTaskContent={updateTaskContent}/>))
+                }
+            </SortableContext>
+        </div>
         
-        <div>footer</div>
+        <button className="
+                flex 
+                gap-2 
+                items-center 
+                bg-gray-700
+                border-gray-700 
+                border-2 
+                rounded-md 
+                p-4 
+                hover:border-gray-500"
+                onClick={() => {createTask(column.id)}}>
+            <FaPlus className="my-auto"/>
+            Add task
+        </button>
     </div>
   )
 }
