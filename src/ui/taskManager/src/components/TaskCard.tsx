@@ -3,16 +3,17 @@ import { Task } from '../types'
 import { FaRegTrashAlt } from 'react-icons/fa';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from "@dnd-kit/utilities";
+import { useStores } from '../stores';
+import TaskEdit from './TaskEdit';
 
 interface Props {
-    task: Task,
-    deleteTask: (taskId: string) => void;
-    updateTaskContent: (taskId: string, content: string) => void;
+    task: Task
 }
 
-function TaskCard({task, deleteTask, updateTaskContent}: Props) {
+function TaskCard({task}: Props) {
     const [mouseIsOver, setMouseIsOver] = useState(false);
     const [editMode, setEditMode] = useState(false);
+    const {taskStore} = useStores();
 
     const {
         setNodeRef, 
@@ -44,8 +45,8 @@ function TaskCard({task, deleteTask, updateTaskContent}: Props) {
         return <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="
         bg-gray-700
         p-2.5
-        h-[100px]
-        min-h-[100px]
+        h-[200px]
+        min-h-[200px]
         items-center
         flex
         text-left
@@ -58,55 +59,19 @@ function TaskCard({task, deleteTask, updateTaskContent}: Props) {
         />
     }
 
-    if (editMode) {
-        return <div ref={setNodeRef} style={style} {...attributes} {...listeners}
-                    className="
-                    bg-gray-700
-                    p-2.5
-                    h-[100px]
-                    min-h-[100px]
-                    items-center
-                    flex
-                    text-left
-                    rounded-xl
-                    hover:ring-2
-                    hover:ring-insert
-                    hover:ring-gray-500
-                    cursor-grab
-                    relative">
-                        <textarea className="
-                            h-[90%]
-                            w-full
-                            resize-none
-                            border-none
-                            rounded
-                            bg-transparent
-                            text-white
-                            focus:outline-none"
-                            value={task.content}
-                            autoFocus
-                            placeholder="Please describe task..."
-                            onBlur={toggleEditMode}
-                            onKeyDown={(e)=> {
-                                if (e.key === 'Enter' && e.shiftKey) toggleEditMode();
-                            }}
-                            onChange={e => { updateTaskContent(task.id, e.target.value); }}
-                        >
-                            {task.content}
-                        </textarea>
-                    </div>
-    }
-
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="
         bg-gray-700
-        p-2.5
-        h-[100px]
-        min-h-[100px]
+        h-[200px]
+        min-h-[200px]
         items-center
         flex
+        flex-wrap
         text-left
-        rounded-xl
+        rounded-lg
+        ring-1
+        ring-insert
+        ring-gray-500
         hover:ring-2
         hover:ring-insert
         hover:ring-gray-500
@@ -114,32 +79,50 @@ function TaskCard({task, deleteTask, updateTaskContent}: Props) {
         relative"
         onMouseEnter={()=>setMouseIsOver(true)}
         onMouseLeave={()=>setMouseIsOver(false)}
-        onClick={toggleEditMode}>
-            <p className="
-                my-auto
-                h-[90%]
+        >
+            <p className={`
+                p-2.5
+                rounded-t-lg
+                ${task.titleColor}
+                mt-0
+                mb-auto
+                h-auto
                 w-full
                 overflow-y-auto
                 overflow-x-hidden
                 whitespace-pre-wrap
-            ">
+                font-bold`}>
+                {task.title}
+            </p>
+            <p className="
+                p-1
+                my-auto
+                h-[80%]
+                w-full
+                overflow-y-auto
+                overflow-x-hidden
+                whitespace-pre-wrap
+                cursor-pointer
+            " onClick={toggleEditMode}>
                 {task.content}
             </p>
-            {mouseIsOver && (<button className="
+            { mouseIsOver && (<button className="
             stroke-white
             absolute
-            right-4
-            top-1/2
+            right-[5px]
+            top-[20px]
             -translate-y-1/2
             p-2
-            rounded
+            rounded-lg
             bg-gray-600
             opacity-60
             hover:opacity-100" 
-            onClick={() => deleteTask(task.id)}
+            onClick={async () => await taskStore.deleteTask(task.id, task.columnId)}
             >
                 <FaRegTrashAlt />
-            </button>)}
+            </button>) }
+            <p className="text-right w-full">{task.assignee}</p>
+            {editMode && <TaskEdit task={task} onClose={toggleEditMode}/>}
     </div>
   )
 }

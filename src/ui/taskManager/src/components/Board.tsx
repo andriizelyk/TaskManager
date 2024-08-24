@@ -1,77 +1,38 @@
-import { useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { FaPlus } from "react-icons/fa"
-import { Column, Task } from "../types";
+import { Color, Column, Size, Task } from "../types";
 import ColumnContainer from "./ColumnContainer";
 import { v4 as uuid } from "uuid";
 import { DndContext, DragEndEvent, DragOverEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { SortableContext, arrayMove } from "@dnd-kit/sortable";
+import { SortableContext } from "@dnd-kit/sortable";
 import { createPortal } from "react-dom";
 import TaskCard from "./TaskCard";
+import { observer } from "mobx-react";
+import { useStores } from "../stores";
+import Spinner from "./Spinner";
 
-function Board() {
-    const [tasks, setTasks] = useState<Task[]>([]);
-    const [columns, setColumns] = useState<Column[]>([]);
-    const columnsId = useMemo(() => columns.map(c => c.id), [columns]);
+interface BoardCardProp {
+    boardId: string;
+}
+
+const Board = observer((props: BoardCardProp) => {
+
+    const { columnStore, taskStore } = useStores();
+    const columnsId = columnStore.columns.map(c => c.id);
     const [activeColumn, setActiveColumn] = useState<Column|null>(null);
     const [activeTask, setActiveTask] = useState<Task|null>(null);
-    
+
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint : {
-                distance: 3, //px
+                distance: 3,
             }
         })
-    )
+    );
 
-    function createTask(columnId: string) {
-        const newTask : Task = {
-            id: uuid(),
-            columnId,
-            content: "Please describe",
-            title: `Task ${tasks.length + 1}`
-        };
-
-        setTasks([...tasks, newTask]);
-
-    }
-
-    function deleteTask(taskId: string) {
-        const allTasksExceptWithId = tasks.filter(t => t.id !== taskId);
-        setTasks(allTasksExceptWithId);
-    }
-
-    function updateTaskContent(taskId: string, content: string) {
-        const updTasks = tasks.map(t => {
-            if (t.id !== taskId) return t;
-            return {...t, content};
-        });
-        setTasks(updTasks);
-    }
-
-    function addNewColumn() {
-        const newColumn : Column = {
-            id: uuid(),
-            title: `Stage #${columns.length + 1}`
-        }
-
-        setColumns([...columns, newColumn]);
-    }
-
-    function deleteColumn(id: string) {
-        const allColumnsExceptWithId = columns.filter(c => c.id !== id);
-        setColumns(allColumnsExceptWithId);
-
-        const allTasksExceptThisColumn = tasks.filter(t => t.columnId !== id);
-        setTasks(allTasksExceptThisColumn);
-    }
-
-    function updateColumnTitle(id: string, title: string) {
-        const newColumns = columns.map((c) => {
-            if (c.id !== id) return c;
-            return { ...c, title};
-        });
-        setColumns(newColumns);
-    }
+    useEffect(() => {
+        columnStore.loadColumns(props.boardId);
+    }, []);
 
     function onDragStart(e: DragStartEvent) {
         if (e.active.data.current?.type === "Column") {
@@ -88,7 +49,7 @@ function Board() {
     function onDragOver(e: DragOverEvent) {
         const { active, over } = e;
         
-        if(!over) return;
+        if (!over) return;
         const activeId = active.id;
         const overId = over.id;
         
@@ -101,24 +62,13 @@ function Board() {
         if (!isActiveATask) return;
 
         if (isActiveATask && isOverATask) {
-            setTasks(tasks => {
-                const activeIndex = tasks.findIndex(t => t.id === activeId);
-                const overIndex = tasks.findIndex(t => t.id === overId);
-                tasks[activeIndex].columnId = tasks[overIndex].columnId
-            
-                return arrayMove(tasks, activeIndex, overIndex);
-            });
+            taskStore.moveOverTask(activeId.toString(), overId.toString());
         }
 
         const isOverAColumn = over.data.current?.type === "Column";
 
         if (isActiveATask && isOverAColumn) {
-            setTasks(tasks => {
-                const activeIndex = tasks.findIndex(t => t.id === activeId);
-                tasks[activeIndex].columnId = overId.toString();
-            
-                return arrayMove(tasks, activeIndex, activeIndex);
-            });
+            taskStore.moveToColumn(activeId.toString(), overId.toString());
         }
     }
 
@@ -128,58 +78,50 @@ function Board() {
 
         const { active, over } = e;
         
-        if(!over) return;
+        if (!over || active.data.current?.type === "Task") return;
         const activeColumnId = active.id;
         const overColumnId = over.id;
         
         if (activeColumnId === overColumnId)
             return;
 
-        setColumns(columns => {
-            const activeIndex = columns.findIndex(c => c.id === activeColumnId);
-            const overIndex = columns.findIndex(c => c.id === overColumnId);
-
-            return arrayMove(columns, activeIndex, overIndex);
-        })
-
+        columnStore.updateColumnsOrder(activeColumnId, overColumnId);
     }
 
   return (
-    <div className="
-    m-auto
-    flex
-    min-h-screen
-    w-full
-    items-center
-    overflow-x-auto
-    overflow-y-hidden
-    px-[40px]
-    ">
+    <div 
+        key = {props.boardId}
+        className="
+        m-auto
+        flex
+        min-h-screen
+        w-full
+        items-center
+        overflow-x-auto
+        overflow-y-hidden
+        px-[40px]
+        ">
+        {columnStore.isLoading && <Spinner size={Size.md} color={Color.blue} text={""}></Spinner>}
         <DndContext 
             sensors={sensors}
             onDragStart={e => onDragStart(e)} 
             onDragEnd={e => onDragEnd(e)}
             onDragOver={e => onDragOver(e)}>
-            <div className="m-auto flex gap-4">
+            <div className="m-auto flex gap-4 p-5">
                 <div className="flex gap-4">
                     <SortableContext items={columnsId}>
-                        {columns.map((c) => (
-                            <ColumnContainer 
-                                key = {c.id} 
-                                column = {c} 
-                                createTask={createTask}
-                                updateColumnTitle = {updateColumnTitle}
-                                deleteColumn = {deleteColumn}
-                                tasks = {tasks.filter(t => t.columnId === c.id)}
-                                deleteTask = {deleteTask}
-                                updateTaskContent = {updateTaskContent}
-                            />))}
+                        {columnStore.columns
+                            .filter(c => c.boardId === props.boardId)
+                            .map((c) => (
+                                <ColumnContainer 
+                                    key = {c.id} 
+                                    column = {c} 
+                                />))}
                     </SortableContext>
                 </div>
                 <button className="
                 h-[60px]
-                w-[350px]
-                min-w-[350px]
+                w-[130px]
                 cursor-pointer
                 rounded-lg
                 bg-gray-700
@@ -189,27 +131,24 @@ function Board() {
                 hover:ring-2
                 flex
                 gap-2"
-                onClick={_ => addNewColumn()}
-                >
+                onClick={_ => {
+                    const newColumn : Column = {
+                        id: uuid(),
+                        title: `Stage #${columnStore.columns.length + 1}`,
+                        order: `${columnStore.columns.length + 1}`,
+                        boardId: props.boardId
+                    };
+
+                    columnStore.addColumn(newColumn);
+                }}>
                     <FaPlus className="my-auto"/>
                     Add state
                     </button>
             </div>
             {createPortal(
                 <DragOverlay>
-                    {activeColumn && <ColumnContainer 
-                                        column={activeColumn} 
-                                        createTask={createTask}
-                                        deleteColumn = {deleteColumn} 
-                                        updateColumnTitle = {updateColumnTitle}
-                                        tasks={tasks.filter(t => t.columnId === activeColumn.id)}
-                                        deleteTask={deleteTask}
-                                        updateTaskContent={updateTaskContent}
-                                    />}
-                    {activeTask && <TaskCard 
-                                        task={activeTask} 
-                                        deleteTask={deleteTask} 
-                                        updateTaskContent={updateTaskContent}/>}
+                    { activeColumn && <ColumnContainer column={activeColumn}/> }
+                    { activeTask && <TaskCard task={activeTask} /> }
                 </DragOverlay>
                 , document.body)}
             
@@ -217,6 +156,6 @@ function Board() {
     </div>
 
   )
-}
+});
 
-export default Board
+export default Board;

@@ -1,0 +1,16 @@
+﻿services:
+  taskmanager.api:
+    image: taskmanager.api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+      - "4001:4001"
+    volumes:
+      - ./https:/https
+    environment:
+      ASPNETCORE_HTTP_PORT: https://+:4001
+      ASPNETCORE_URLS: "http://+:4000;https://+:4001"
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /https/devcert.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password: "pwd123qwerty"
